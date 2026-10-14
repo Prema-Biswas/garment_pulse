@@ -1,4 +1,5 @@
 
+
 import 'package:flutter/material.dart';
 
 void main() {
@@ -41,24 +42,36 @@ class _GarmentPulseAppState extends State<GarmentPulseApp> {
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
       ),
-      home: DashboardPage(
-        orders: orders,
-        onOpenOrders: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => OrderManagementPage(
-                orders: orders,
-                onAddOrder: (order) {
-                  setState(() {
-                    orders.add(order);
-                  });
-                },
+      home: Builder(
+        builder: (homeContext) => DashboardPage(
+          orders: orders,
+          onOpenOrders: () async {
+            await Navigator.push(
+              homeContext,
+              MaterialPageRoute(
+                builder: (context) => OrderManagementPage(
+                  orders: orders,
+                  onAddOrder: (order) {
+                    setState(() {
+                      orders.add(order);
+                    });
+                  },
+                ),
               ),
-            ),
-          );
-          setState(() {});
-        },
+            );
+            setState(() {});
+          },
+          onOpenTracking: () {
+            Navigator.push(
+              homeContext,
+              MaterialPageRoute(
+                builder: (context) => ProductionTrackingPage(
+                  orders: orders,
+                ),
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -67,11 +80,13 @@ class _GarmentPulseAppState extends State<GarmentPulseApp> {
 class DashboardPage extends StatelessWidget {
   final List<GarmentOrder> orders;
   final VoidCallback onOpenOrders;
+  final VoidCallback onOpenTracking;
 
   const DashboardPage({
     super.key,
     required this.orders,
     required this.onOpenOrders,
+    required this.onOpenTracking,
   });
 
   @override
@@ -100,7 +115,10 @@ class DashboardPage extends StatelessWidget {
         children: [
           const Text(
             'Production Dashboard',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
@@ -110,7 +128,10 @@ class DashboardPage extends StatelessWidget {
           const SizedBox(height: 22),
           const Text(
             'Production Overview',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           Row(
@@ -159,14 +180,17 @@ class DashboardPage extends StatelessWidget {
           const SizedBox(height: 26),
           const Text(
             'Management Modules',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 12),
           ModuleTile(
             icon: Icons.assignment_outlined,
             title: 'Production Tracking',
             subtitle: 'Track orders and production progress',
-            onTap: onOpenOrders,
+            onTap: onOpenTracking,
           ),
           const ModuleTile(
             icon: Icons.verified_outlined,
@@ -273,6 +297,239 @@ class ModuleTile extends StatelessWidget {
   }
 }
 
+// Separate Production Tracking page
+class ProductionTrackingPage extends StatelessWidget {
+  final List<GarmentOrder> orders;
+
+  const ProductionTrackingPage({
+    super.key,
+    required this.orders,
+  });
+
+  double getProgress(String status) {
+    switch (status) {
+      case 'Completed':
+        return 1.0;
+      case 'Quality Issue':
+        return 0.25;
+      default:
+        return 0.5;
+    }
+  }
+
+  Color getStatusColor(String status) {
+    switch (status) {
+      case 'Completed':
+        return const Color(0xFF16865B);
+      case 'Quality Issue':
+        return const Color(0xFFD74646);
+      default:
+        return const Color(0xFFDE8A18);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Production Tracking'),
+        backgroundColor: const Color(0xFF146C60),
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(18),
+        children: [
+          const Text(
+            'Production Progress',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Monitor the status of every garment order.',
+            style: TextStyle(color: Colors.grey.shade700),
+          ),
+          const SizedBox(height: 18),
+          Card(
+            elevation: 0,
+            color: Colors.white,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 36,
+                    color: Color(0xFF146C60),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Total Tracked Orders'),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${orders.length}',
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          if (orders.isEmpty)
+            const Card(
+              child: Padding(
+                padding: EdgeInsets.all(22),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.hourglass_empty,
+                      size: 42,
+                      color: Color(0xFF146C60),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'No orders to track yet.',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      'Open Order Management and add an order first.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ...orders.map((order) {
+            final progress = getProgress(order.status);
+            final color = getStatusColor(order.status);
+
+            return Card(
+              elevation: 0,
+              color: Colors.white,
+              margin: const EdgeInsets.only(bottom: 14),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.precision_manufacturing_outlined,
+                          color: Color(0xFF146C60),
+                          size: 30,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            order.product,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Divider(height: 24),
+                    Text('Buyer: ${order.buyer}'),
+                    const SizedBox(height: 6),
+                    Text('Quantity: ${order.quantity} pieces'),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'Current Status',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        Flexible(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: color.withAlpha(25),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              order.status,
+                              textAlign: TextAlign.end,
+                              style: TextStyle(
+                                color: color,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Estimated Progress',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          '${(progress * 100).round()}%',
+                          style: TextStyle(
+                            color: color,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 9,
+                      backgroundColor: Colors.grey.shade200,
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
+          if (orders.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 12),
+              child: Text(
+                'Note: Progress percentages are demo estimates based on '
+                'the selected status, not live factory measurements.',
+                style: TextStyle(
+                  color: Colors.grey.shade700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class OrderManagementPage extends StatefulWidget {
   final List<GarmentOrder> orders;
   final ValueChanged<GarmentOrder> onAddOrder;
@@ -284,7 +541,8 @@ class OrderManagementPage extends StatefulWidget {
   });
 
   @override
-  State<OrderManagementPage> createState() => _OrderManagementPageState();
+  State<OrderManagementPage> createState() =>
+      _OrderManagementPageState();
 }
 
 class _OrderManagementPageState extends State<OrderManagementPage> {
@@ -307,10 +565,15 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
     final product = productController.text.trim();
     final quantity = int.tryParse(quantityController.text.trim());
 
-    if (buyer.isEmpty || product.isEmpty || quantity == null || quantity <= 0) {
+    if (buyer.isEmpty ||
+        product.isEmpty ||
+        quantity == null ||
+        quantity <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Enter buyer, product and a valid quantity.'),
+          content: Text(
+            'Enter buyer, product and a valid quantity.',
+          ),
         ),
       );
       return;
@@ -325,12 +588,16 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       ),
     );
 
+    setState(() {});
+
     buyerController.clear();
     productController.clear();
     quantityController.clear();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Order added successfully!')),
+      const SnackBar(
+        content: Text('Order added successfully!'),
+      ),
     );
   }
 
@@ -347,7 +614,10 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
         children: [
           const Text(
             'Add New Order',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -376,7 +646,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            value: status,
+            initialValue: status,
             decoration: const InputDecoration(
               labelText: 'Production Status',
               border: OutlineInputBorder(),
@@ -413,14 +683,19 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
           const SizedBox(height: 26),
           Text(
             'Orders (${widget.orders.length})',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 10),
           if (widget.orders.isEmpty)
             const Card(
               child: Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('No orders yet. Add your first order above.'),
+                child: Text(
+                  'No orders yet. Add your first order above.',
+                ),
               ),
             ),
           ...widget.orders.map(
@@ -433,7 +708,8 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
                 title: Text(order.product),
                 subtitle: Text(
                   'Buyer: ${order.buyer}\n'
-                  'Quantity: ${order.quantity} | Status: ${order.status}',
+                  'Quantity: ${order.quantity} | '
+                  'Status: ${order.status}',
                 ),
                 isThreeLine: true,
               ),
