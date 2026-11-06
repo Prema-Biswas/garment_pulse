@@ -1,23 +1,39 @@
 
 
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'login_page.dart';
 
 void main() {
   runApp(const GarmentPulseApp());
 }
 
 class GarmentOrder {
+  final int id;
   final String buyer;
   final String product;
   final int quantity;
   final String status;
 
   GarmentOrder({
+    required this.id,
     required this.buyer,
     required this.product,
     required this.quantity,
     required this.status,
   });
+
+  // Convert JSON data into GarmentOrder object
+  factory GarmentOrder.fromJson(Map<String, dynamic> json) {
+    return GarmentOrder(
+      id: json['id'],
+      buyer: json['buyer'],
+      product: json['product'],
+      quantity: json['quantity'],
+      status: json['status'],
+    );
+  }
 }
 
 class GarmentPulseApp extends StatefulWidget {
@@ -29,6 +45,7 @@ class GarmentPulseApp extends StatefulWidget {
 
 class _GarmentPulseAppState extends State<GarmentPulseApp> {
   final List<GarmentOrder> orders = [];
+  bool isLoggedIn = false;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +59,8 @@ class _GarmentPulseAppState extends State<GarmentPulseApp> {
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF5F7FA),
       ),
-      home: Builder(
+       home: isLoggedIn
+    ? Builder(
         builder: (homeContext) => DashboardPage(
           orders: orders,
           onOpenOrders: () async {
@@ -72,6 +90,13 @@ class _GarmentPulseAppState extends State<GarmentPulseApp> {
             );
           },
         ),
+      )
+    : LoginPage(
+        onLoginSuccess: () {
+          setState(() {
+            isLoggedIn = true;
+          });
+        },
       ),
     );
   }
@@ -579,14 +604,15 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
       return;
     }
 
-    widget.onAddOrder(
-      GarmentOrder(
-        buyer: buyer,
-        product: product,
-        quantity: quantity,
-        status: status,
-      ),
-    );
+widget.onAddOrder(
+  GarmentOrder(
+    id: DateTime.now().millisecondsSinceEpoch,
+    buyer: buyer,
+    product: product,
+    quantity: quantity,
+    status: status,
+  ),
+);
 
     setState(() {});
 
