@@ -379,11 +379,12 @@ final averageRating = inspectedOrders == 0
   }
 }
 
-class OverviewCard extends StatelessWidget {
+class OverviewCard extends StatefulWidget {
   final String title;
   final String value;
   final IconData icon;
   final Color color;
+  final int delay;
 
   const OverviewCard({
     super.key,
@@ -391,38 +392,96 @@ class OverviewCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
+    this.delay = 0,
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+  State<OverviewCard> createState() => _OverviewCardState();
+}
+
+class _OverviewCardState extends State<OverviewCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _fadeAnimation;
+  late final Animation<Offset> _slideAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
+
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(0, 0.8),
+      end: Offset.zero,
+    ).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: Curves.easeOutBack,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 14),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 26,
-                fontWeight: FontWeight.bold,
-              ),
+    );
+
+    Future.delayed(Duration(milliseconds: widget.delay), () {
+      if (mounted) {
+        _controller.forward();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: SlideTransition(
+        position: _slideAnimation,
+        child: Card(
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(widget.icon, color: widget.color, size: 28),
+                const SizedBox(height: 14),
+                Text(
+                  widget.value,
+                  style: const TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  widget.title,
+                  style: const TextStyle(fontSize: 12),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(title, style: const TextStyle(fontSize: 12)),
-          ],
+          ),
         ),
       ),
     );
   }
 }
+ 
 
 class ModuleTile extends StatelessWidget {
   final IconData icon;
