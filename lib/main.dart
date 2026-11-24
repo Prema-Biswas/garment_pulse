@@ -2,12 +2,14 @@
 
 import 'package:flutter/material.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+
 import 'login_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   runApp(const GarmentPulseApp());
 }
+
 
 class GarmentOrder {
   final int id;
@@ -15,6 +17,11 @@ class GarmentOrder {
   final String product;
   final int quantity;
   final String status;
+  final DateTime? deliveryDate;
+
+  // Quality Control fields
+  final int? qualityRating;
+  final String? inspectionRemarks;
 
   GarmentOrder({
     required this.id,
@@ -22,9 +29,11 @@ class GarmentOrder {
     required this.product,
     required this.quantity,
     required this.status,
+    this.deliveryDate,
+    this.qualityRating,
+    this.inspectionRemarks,
   });
 
-  // Convert JSON data into GarmentOrder object
   factory GarmentOrder.fromJson(Map<String, dynamic> json) {
     return GarmentOrder(
       id: json['id'],
@@ -32,9 +41,46 @@ class GarmentOrder {
       product: json['product'],
       quantity: json['quantity'],
       status: json['status'],
+      deliveryDate: json['deliveryDate'] != null
+          ? DateTime.parse(json['deliveryDate'])
+          : null,
+      qualityRating: json['qualityRating'] == null
+          ? null
+          : (json['qualityRating'] as num).toInt(),
+      inspectionRemarks: json['inspectionRemarks'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'buyer': buyer,
+      'product': product,
+      'quantity': quantity,
+      'status': status,
+      'deliveryDate': deliveryDate?.toIso8601String(),
+      'qualityRating': qualityRating,
+      'inspectionRemarks': inspectionRemarks,
+    };
+  }
+
+  GarmentOrder copyWith({
+    int? qualityRating,
+    String? inspectionRemarks,
+  }) {
+    return GarmentOrder(
+      id: id,
+      buyer: buyer,
+      product: product,
+      quantity: quantity,
+      status: status,
+      deliveryDate: deliveryDate,
+      qualityRating: qualityRating ?? this.qualityRating,
+      inspectionRemarks: inspectionRemarks ?? this.inspectionRemarks,
     );
   }
 }
+
 
 class GarmentPulseApp extends StatefulWidget {
   const GarmentPulseApp({super.key});
@@ -46,6 +92,48 @@ class GarmentPulseApp extends StatefulWidget {
 class _GarmentPulseAppState extends State<GarmentPulseApp> {
   final List<GarmentOrder> orders = [];
   bool isLoggedIn = false;
+
+  // Save all orders to local storage
+  Future<void> saveOrders() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final ordersJson = orders
+        .map((order) => order.toJson())
+        .toList();
+
+    await prefs.setString(
+      'saved_orders',
+      jsonEncode(ordersJson),
+    );
+  }
+
+  // Load saved orders from local storage
+  Future<void> loadOrders() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final savedData = prefs.getString('saved_orders');
+
+    if (savedData != null) {
+      final List<dynamic> decodedData = jsonDecode(savedData);
+
+      setState(() {
+        orders.clear();
+
+        orders.addAll(
+          decodedData.map(
+            (item) => GarmentOrder.fromJson(item),
+          ),
+        );
+      });
+    }
+  }
+    @override
+  void initState() {
+    super.initState();
+    loadOrders();
+  }
+
+ 
 
   @override
   Widget build(BuildContext context) {
@@ -69,11 +157,15 @@ class _GarmentPulseAppState extends State<GarmentPulseApp> {
               MaterialPageRoute(
                 builder: (context) => OrderManagementPage(
                   orders: orders,
-                  onAddOrder: (order) {
-                    setState(() {
-                      orders.add(order);
-                    });
-                  },
+                 
+                   onAddOrder: (order) {
+                         setState(() {
+                         orders.add(order);
+                          });
+
+                          saveOrders();
+                   },
+
                 ),
               ),
             );
@@ -89,6 +181,17 @@ class _GarmentPulseAppState extends State<GarmentPulseApp> {
               ),
             );
           },
+          onOpenQuality: () {
+  Navigator.push(
+    homeContext,
+    MaterialPageRoute(
+      builder: (context) => QualityControlPage(
+        orders: orders,
+        onSave: saveOrders,
+      ),
+    ),
+  );
+},
         ),
       )
     : LoginPage(
@@ -106,12 +209,14 @@ class DashboardPage extends StatelessWidget {
   final List<GarmentOrder> orders;
   final VoidCallback onOpenOrders;
   final VoidCallback onOpenTracking;
+  final VoidCallback onOpenQuality;
 
   const DashboardPage({
     super.key,
     required this.orders,
     required this.onOpenOrders,
     required this.onOpenTracking,
+    required this.onOpenQuality,
   });
 
   @override
@@ -122,6 +227,17 @@ class DashboardPage extends StatelessWidget {
         orders.where((o) => o.status == 'Completed').length;
     final qualityIssues =
         orders.where((o) => o.status == 'Quality Issue').length;
+       final ratedOrders =
+    orders.where((o) => o.qualityRating != null);
+
+final inspectedOrders = ratedOrders.length;
+
+final averageRating = inspectedOrders == 0
+    ? 0.0
+    : ratedOrders
+            .map((o) => o.qualityRating!)
+            .reduce((a, b) => a + b) /
+        inspectedOrders; 
 
     return Scaffold(
       appBar: AppBar(
@@ -202,6 +318,29 @@ class DashboardPage extends StatelessWidget {
               ),
             ],
           ),
+                    const SizedBox(height: 12),
+
+          Row(
+            children: [
+              Expanded(
+                child: OverviewCard(
+                  title: 'Average Rating',
+                  value: '${averageRating.toStringAsFixed(1)} / 5',
+                  icon: Icons.star_rate_rounded,
+                  color: const Color(0xFFE5A000),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OverviewCard(
+                  title: 'Inspected Orders',
+                  value: '$inspectedOrders',
+                  icon: Icons.fact_check_outlined,
+                  color: const Color(0xFF16865B),
+                ),
+              ),
+            ],
+          ),
           const SizedBox(height: 26),
           const Text(
             'Management Modules',
@@ -217,11 +356,12 @@ class DashboardPage extends StatelessWidget {
             subtitle: 'Track orders and production progress',
             onTap: onOpenTracking,
           ),
-          const ModuleTile(
-            icon: Icons.verified_outlined,
-            title: 'Quality Control',
-            subtitle: 'Monitor inspections and quality issues',
-          ),
+          ModuleTile(
+  icon: Icons.verified_outlined,
+  title: 'Quality Control',
+  subtitle: 'Monitor inspections and quality issues',
+  onTap: onOpenQuality,
+),
           ModuleTile(
             icon: Icons.inventory_outlined,
             title: 'Order Management',
@@ -576,6 +716,7 @@ class _OrderManagementPageState extends State<OrderManagementPage> {
   final quantityController = TextEditingController();
 
   String status = 'In Production';
+  DateTime? deliveryDate;
 
   @override
   void dispose() {
@@ -611,6 +752,7 @@ widget.onAddOrder(
     product: product,
     quantity: quantity,
     status: status,
+    deliveryDate: deliveryDate,
   ),
 );
 
@@ -619,6 +761,9 @@ widget.onAddOrder(
     buyerController.clear();
     productController.clear();
     quantityController.clear();
+    setState(() {
+  deliveryDate = null;
+});
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -626,6 +771,20 @@ widget.onAddOrder(
       ),
     );
   }
+  Future<void> pickDeliveryDate() async {
+  final pickedDate = await showDatePicker(
+    context: context,
+    initialDate: deliveryDate ?? DateTime.now(),
+    firstDate: DateTime.now(),
+    lastDate: DateTime(2030),
+  );
+
+  if (pickedDate != null) {
+    setState(() {
+      deliveryDate = pickedDate;
+    });
+  }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -697,6 +856,22 @@ widget.onAddOrder(
               }
             },
           ),
+                    const SizedBox(height: 12),
+
+          OutlinedButton.icon(
+            onPressed: pickDeliveryDate,
+            icon: const Icon(Icons.calendar_month),
+            label: Text(
+              deliveryDate == null
+                  ? 'Select Delivery Date'
+                  : 'Delivery Date: ${deliveryDate!.day}/${deliveryDate!.month}/${deliveryDate!.year}',
+            ),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+            ),
+          ),
+
+          const SizedBox(height: 12),
           const SizedBox(height: 16),
           SizedBox(
             height: 50,
@@ -733,16 +908,187 @@ widget.onAddOrder(
                 ),
                 title: Text(order.product),
                 subtitle: Text(
-                  'Buyer: ${order.buyer}\n'
-                  'Quantity: ${order.quantity} | '
-                  'Status: ${order.status}',
-                ),
+                     'Buyer: ${order.buyer}\n'
+                     'Quantity: ${order.quantity} | '
+                     'Status: ${order.status}\n'
+                     'Delivery Date: ${order.deliveryDate == null ? 'Not set' : '${order.deliveryDate!.day}/${order.deliveryDate!.month}/${order.deliveryDate!.year}'}',
+                    ),
                 isThreeLine: true,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class QualityControlPage extends StatefulWidget {
+  final List<GarmentOrder> orders;
+  final Future<void> Function() onSave;
+
+  const QualityControlPage({
+    super.key,
+    required this.orders,
+    required this.onSave,
+  });
+
+  @override
+  State<QualityControlPage> createState() =>
+      _QualityControlPageState();
+}
+
+class _QualityControlPageState
+    extends State<QualityControlPage> {
+
+  String getQualityStatus(int rating) {
+    if (rating <= 2) return 'Needs Improvement';
+    if (rating == 3) return 'Fair';
+    if (rating == 4) return 'Good';
+    return 'Excellent';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Quality Control'),
+        backgroundColor: const Color(0xFF146C60),
+        foregroundColor: Colors.white,
+      ),
+
+      body: widget.orders.isEmpty
+          ? const Center(
+              child: Text('No orders available for inspection.'),
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: widget.orders.length,
+
+              itemBuilder: (context, index) {
+                final order = widget.orders[index];
+                final rating = order.qualityRating ?? 0;
+
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  color: Colors.white,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+
+                      children: [
+                        Text(
+                          order.product,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        Text('Buyer: ${order.buyer}'),
+                        Text('Order ID: ${order.id}'),
+
+                        const Divider(height: 24),
+
+                        const Text(
+                          'Product Quality Rating',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        Row(
+                          children: List.generate(5, (starIndex) {
+                            final starNumber = starIndex + 1;
+
+                            return IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  widget.orders[index] =
+                                      order.copyWith(
+                                    qualityRating: starNumber,
+                                  );
+                                });
+                              },
+
+                              icon: Icon(
+                                starNumber <= rating
+                                    ? Icons.star
+                                    : Icons.star_border,
+                                color: Colors.amber,
+                                size: 32,
+                              ),
+                            );
+                          }),
+                        ),
+
+                        Text(
+                          rating == 0
+                              ? 'Not rated yet'
+                              : '$rating / 5 - ${getQualityStatus(rating)}',
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        TextFormField(
+                          initialValue:
+                              order.inspectionRemarks ?? '',
+
+                          decoration: const InputDecoration(
+                            labelText: 'Inspection Remarks',
+                            hintText: 'Write inspection comments...',
+                            border: OutlineInputBorder(),
+                          ),
+
+                          maxLines: 3,
+
+                          onChanged: (value) {
+                            widget.orders[index] =
+                                widget.orders[index].copyWith(
+                              inspectionRemarks: value,
+                            );
+                          },
+                        ),
+
+                        const SizedBox(height: 16),
+
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: rating == 0
+                                ? null
+                                : () async {
+                                    await widget.onSave();
+
+                                    if (!context.mounted) return;
+
+                                    ScaffoldMessenger.of(context)
+                                        .showSnackBar(
+                                      const SnackBar(
+                                        content: Text(
+                                          'Quality inspection saved successfully!',
+                                        ),
+                                      ),
+                                    );
+                                  },
+
+                            icon: const Icon(Icons.save),
+                            label: const Text('Save Inspection'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }

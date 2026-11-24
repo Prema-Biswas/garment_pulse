@@ -26,7 +26,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _rememberMe = false;
 
   // Backend API address
-  static const String baseUrl = 'http://192.168.0.104:3000';
+  static const String baseUrl = 'http://192.168.0.108:3000';
 
   @override
   void dispose() {

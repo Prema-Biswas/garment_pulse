@@ -25,7 +25,7 @@ class _RegistrationPageState extends State<RegistrationPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
-  static const String baseUrl = 'http://192.168.0.104:3000';
+  static const String baseUrl = 'http://192.168.0.108:3000';
 
   @override
   void dispose() {
